@@ -1,35 +1,24 @@
 from __future__ import annotations
 
-import pandas as pd
 import streamlit as st
-from sqlalchemy import text
 
-from app.db import engine
+from app.data_access.repo import load_data
+from app.views.overview import render_overview
+from app.views.heatmap import render_heatmap
+from app.views.red_flags import render_red_flags
+from app.views.dog_profile import render_dog_profile
+from app.views.data_entry import render_data_entry
+
 
 st.set_page_config(page_title="Husky Tracking (Demo)", layout="wide")
 st.title("Husky Tracking — Demo")
-
-
-@st.cache_data
-def load_data() -> pd.DataFrame:
-    q = """
-    SELECT d.name AS dog_name, t.date, t.distance_km
-    FROM training_log t
-    JOIN dogs d ON d.id = t.dog_id
-    ORDER BY t.date, d.name
-    """
-    df = pd.read_sql(text(q), engine)
-    df["date"] = pd.to_datetime(df["date"])
-    df["distance_km"] = pd.to_numeric(df["distance_km"], errors="coerce").fillna(0.0)
-    return df
-
 
 df = load_data()
 if df.empty:
     st.warning("No data in database yet. Run import first.")
     st.stop()
 
-# --- Date filters
+# --- Date filters (global)
 min_date = df["date"].min().date()
 max_date = df["date"].max().date()
 
@@ -49,14 +38,14 @@ with col2:
         max_value=max_date,
     )
 
-# Ensure correct order (if user picks backwards)
+# Ensure correct order
 if date_from > date_to:
     date_from, date_to = date_to, date_from
 
 mask = (df["date"].dt.date >= date_from) & (df["date"].dt.date <= date_to)
 dff = df.loc[mask].copy()
 
-# --- KPIs (same row)
+# --- KPIs (global)
 k1, k2, k3 = st.columns(3)
 with k1:
     st.metric("Dogs", int(dff["dog_name"].nunique()))
@@ -67,32 +56,20 @@ with k3:
 
 st.divider()
 
-# --- Top dogs with rank
-top = (
-    dff.groupby("dog_name", as_index=False)["distance_km"]
-    .sum()
-    .sort_values("distance_km", ascending=False)
-    .head(10)
-)
+tabs = st.tabs(["Overview", "Heatmap", "Dog profile", "Red flags", "Data entry"])
 
-top_ranked = top.reset_index(drop=True)
-top_ranked.insert(0, "rank", top_ranked.index + 1)
-top_ranked["distance_km"] = top_ranked["distance_km"].round(1)
+with tabs[0]:
+    render_overview(dff)
 
-# --- Daily sum (robust: column name is guaranteed)
-daily = (
-    dff.assign(date=dff["date"].dt.floor("D"))
-    .groupby("date", as_index=False)["distance_km"]
-    .sum()
-    .sort_values("date")
-)
+with tabs[1]:
+    render_heatmap(dff)
 
-c1, c2 = st.columns(2)
+with tabs[2]:
+    render_dog_profile(dff)
 
-with c1:
-    st.subheader("Top-10 dogs by total km")
-    st.dataframe(top_ranked, use_container_width=True, hide_index=True)
+with tabs[3]:
+    render_red_flags(dff)
 
-with c2:
-    st.subheader("Total km per day")
-    st.line_chart(daily.set_index("date"))
+with tabs[4]:
+    # Data entry writes to DB, and can export selected period to Excel
+    render_data_entry(dff=dff, date_from=date_from, date_to=date_to)
