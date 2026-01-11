@@ -8,6 +8,7 @@ from app.views.heatmap import render_heatmap
 from app.views.red_flags import render_red_flags
 from app.views.dog_profile import render_dog_profile
 from app.views.data_entry import render_data_entry
+from app.views.team_suggestions import render_team_suggestions
 
 
 st.set_page_config(page_title="Husky Tracking (Demo)", layout="wide")
@@ -56,7 +57,7 @@ with k3:
 
 st.divider()
 
-tabs = st.tabs(["Overview", "Heatmap", "Dog profile", "Red flags", "Data entry"])
+tabs = st.tabs(["Overview", "Heatmap", "Dog profile", "Red flags", "Data entry", "Team suggestions"])
 
 with tabs[0]:
     render_overview(dff)
@@ -73,3 +74,6 @@ with tabs[3]:
 with tabs[4]:
     # Data entry writes to DB, and can export selected period to Excel
     render_data_entry(dff=dff, date_from=date_from, date_to=date_to)
+
+with tabs[5]:
+    render_team_suggestions(dff)
