@@ -1,0 +1,9 @@
+site_name: Husky Tracking
+theme:
+  name: material
+nav:
+  - Home: index.md
+  - About: about.md
+  - Demo: demo.md
+  - Architecture: architecture.md
+  - Roadmap: roadmap.md
