@@ -6,64 +6,89 @@ import streamlit as st
 from app.views.red_flags import Thresholds
 
 
+def _sync_dp_to_rf(dp_key: str, rf_key: str) -> None:
+    """
+    Sync a dp_* widget value into the shared rf_* session state.
+    Called only on user interaction via on_change.
+    """
+    st.session_state[rf_key] = int(st.session_state[dp_key])
+
+
 def _thresholds_sidebar_in_profile() -> Thresholds:
     """
     Threshold controls inside Dog profile tab.
-    Widget keys are unique (dp_*), but values are synced to shared rf_* in session_state.
+
+    - UI widgets use dp_* keys (unique to this view).
+    - Shared state lives in rf_* keys (used by Red flags, Team suggestions, etc.).
+    - We only write to rf_* when the user changes the dp_* sliders (on_change),
+      to avoid overriding other tabs during reruns.
     """
     st.caption("Alert thresholds (synced with Red flags tab)")
 
-    # initial defaults from shared rf_* (if exist)
-    rf_day = int(st.session_state.get("rf_hard_day", 18))
-    rf_streak = int(st.session_state.get("rf_streak", 3))
-    rf_share = int(st.session_state.get("rf_share", 40))
-    rf_week = int(st.session_state.get("rf_week", 180))
+    # Ensure shared defaults exist
+    st.session_state.setdefault("rf_hard_day", 18)
+    st.session_state.setdefault("rf_streak", 3)
+    st.session_state.setdefault("rf_share", 40)
+    st.session_state.setdefault("rf_week", 180)
+
+    # Initialize dp_* from rf_* only if dp_* is not set yet
+    st.session_state.setdefault("dp_rf_hard_day", int(st.session_state["rf_hard_day"]))
+    st.session_state.setdefault("dp_rf_streak", int(st.session_state["rf_streak"]))
+    st.session_state.setdefault("dp_rf_share", int(st.session_state["rf_share"]))
+    st.session_state.setdefault("dp_rf_week", int(st.session_state["rf_week"]))
 
     s1, s2, s3, s4 = st.columns(4)
+
     with s1:
         hard_day_threshold = st.slider(
             "Hard day (km)",
             0, 60,
-            value=rf_day,
+            value=int(st.session_state["dp_rf_hard_day"]),
             step=1,
             key="dp_rf_hard_day",
+            on_change=_sync_dp_to_rf,
+            kwargs={"dp_key": "dp_rf_hard_day", "rf_key": "rf_hard_day"},
         )
+
     with s2:
         hard_streak_days = st.slider(
             "Hard streak (days)",
             2, 10,
-            value=rf_streak,
+            value=int(st.session_state["dp_rf_streak"]),
             step=1,
             key="dp_rf_streak",
+            on_change=_sync_dp_to_rf,
+            kwargs={"dp_key": "dp_rf_streak", "rf_key": "rf_streak"},
         )
+
     with s3:
         hard_days_share = st.slider(
             "Hard days share (%)",
             0, 100,
-            value=rf_share,
+            value=int(st.session_state["dp_rf_share"]),
             step=5,
             key="dp_rf_share",
+            on_change=_sync_dp_to_rf,
+            kwargs={"dp_key": "dp_rf_share", "rf_key": "rf_share"},
         )
+
     with s4:
         week_threshold = st.slider(
             "7-day total (km)",
             0, 500,
-            value=rf_week,
+            value=int(st.session_state["dp_rf_week"]),
             step=5,
             key="dp_rf_week",
+            on_change=_sync_dp_to_rf,
+            kwargs={"dp_key": "dp_rf_week", "rf_key": "rf_week"},
         )
 
-    # sync back to shared rf_* values (used by Red flags)
-    st.session_state["rf_hard_day"] = hard_day_threshold
-    st.session_state["rf_streak"] = hard_streak_days
-    st.session_state["rf_share"] = hard_days_share
-    st.session_state["rf_week"] = week_threshold
-
+    # Read the shared rf_* values as the source of truth for calculations
     return Thresholds(
-        hard_day_threshold=hard_day_threshold,
-        hard_streak_days=hard_streak_days,
-        hard_days_share=hard_days_share,
-        week_threshold=week_threshold,
+        hard_day_threshold=int(st.session_state["rf_hard_day"]),
+        hard_streak_days=int(st.session_state["rf_streak"]),
+        hard_days_share=int(st.session_state["rf_share"]),
+        week_threshold=int(st.session_state["rf_week"]),
     )
 
 
@@ -96,10 +121,9 @@ def render_dog_profile(dff: pd.DataFrame, thr: Thresholds | None = None) -> None
     st.divider()
     st.subheader("Alerts for this dog")
 
-    # show thresholds controls here (synced with Red flags)
+    # Threshold controls here (synced to shared rf_*)
     thr = _thresholds_sidebar_in_profile()
 
-    # daily series for selected dog
     dog_series = (
         dff[dff["dog_name"] == selected_dog]
         .assign(date=lambda x: x["date"].dt.floor("D"))
@@ -110,12 +134,10 @@ def render_dog_profile(dff: pd.DataFrame, thr: Thresholds | None = None) -> None
 
     dog_series["is_hard"] = dog_series["distance_km"] >= thr.hard_day_threshold
 
-    # hard share
     days_total = int(dog_series["date"].nunique())
     hard_days_cnt = int(dog_series["is_hard"].sum())
     hard_share_pct = (hard_days_cnt / days_total * 100) if days_total else 0.0
 
-    # max hard streak
     max_streak = 0
     cur = 0
     for v in dog_series["is_hard"].tolist():
@@ -125,11 +147,9 @@ def render_dog_profile(dff: pd.DataFrame, thr: Thresholds | None = None) -> None
         else:
             cur = 0
 
-    # max 7-day rolling total
     dog_roll = dog_series.set_index("date")["distance_km"].rolling("7D").sum()
     max_7d = float(dog_roll.max()) if not dog_roll.empty else 0.0
 
-    # status
     triggers = []
     if max_streak >= thr.hard_streak_days:
         triggers.append("hard-day streak")
