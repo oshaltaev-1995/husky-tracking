@@ -24,10 +24,10 @@ jobs:
         uses: astral-sh/setup-uv@v3
 
       - name: Sync deps
-        run: uv sync --directory docs
+        run: uv sync --directory repo/docs
 
       - name: Build mkdocs
-        run: uv run --directory docs mkdocs build --site-dir ../site
+        run: uv run --directory repo/docs mkdocs build --site-dir ../../site
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
