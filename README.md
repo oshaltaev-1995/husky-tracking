@@ -3,6 +3,9 @@ HUSKY TRACKING DEMO
 Streamlit demo for monitoring sled dog workload, detecting workload alerts,
 and generating team layouts using explainable rule-based logic.
 
+See documentation here deployed at GitHub pages:
+https://oshaltaev-1995.github.io/husky-tracking/
+
 REQUIREMENTS
 - Python 3.11+ (recommended)
 - Git
@@ -11,15 +14,15 @@ QUICK START (RECOMMENDED: UV)
 
 1) Clone the repository
 
-git clone git@github.com:oshaltaev-1995/husky-tracking.git
-cd husky-tracking
+- git clone git@github.com:oshaltaev-1995/husky-tracking.git
+- cd husky-tracking
 
 2) Install uv (if not installed)
 
-macOS / Linux:
+- macOS / Linux:
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-Windows (PowerShell):
+- Windows (PowerShell):
 irm https://astral.sh/uv/install.ps1 | iex
 
 Restart your terminal if uv is not found.
